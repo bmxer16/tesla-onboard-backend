@@ -1,10 +1,3 @@
-/**
- * Mission Log routes — every drive is a mission.
- * POST /api/missions/start        → snapshot vehicle, open mission
- * POST /api/missions/:id/complete → snapshot again, compute stats
- * GET  /api/missions              → list + active mission
- * DELETE /api/missions/:id        → abort/remove
- */
 import express from "express";
 import crypto from "crypto";
 import * as teslaApi from "../lib/teslaApi.js";
@@ -13,10 +6,12 @@ import { getMissions, saveMissions } from "../lib/missionStore.js";
 
 const router = express.Router();
 
-const PACK_KWH = 75;       // est. usable pack (Model 3)
-const RATE_PER_KWH = 0.16; // blended home/supercharger estimate
+const PACK_KWH = 75;
+const RATE_PER_KWH = 0.16;
 const GAS_MPG = 30;
-const GAS_PRICE = 4.8;     // CA average estimate
+const GAS_PRICE = 4.8;
+const IRS_RATE = 0.725;
+const CATEGORIES = ["business", "rental", "family"];
 
 async function snapshot(userId) {
   const vehicles = await teslaApi.listVehicles(userId);
@@ -40,6 +35,7 @@ router.get("/", requireAuth, (req, res) => {
   res.json({
     missions: [...missions].reverse(),
     active: missions.find((m) => m.status === "active") || null,
+    irsRate: IRS_RATE,
   });
 });
 
@@ -49,6 +45,7 @@ router.post("/start", requireAuth, async (req, res) => {
     const existing = missions.find((m) => m.status === "active");
     if (existing) return res.json({ mission: existing, alreadyActive: true });
 
+    const category = CATEGORIES.includes(req.body?.category) ? req.body.category : "family";
     const start = await snapshot(req.userId);
     if (start.odometer == null) {
       return res.status(409).json({ error: "vehicle_asleep", detail: "Wake your vehicle first, then begin the mission." });
@@ -57,6 +54,7 @@ router.post("/start", requireAuth, async (req, res) => {
       id: crypto.randomUUID(),
       number: missions.length + 1,
       status: "active",
+      category,
       start,
       startedAt: start.at,
     };
@@ -79,19 +77,27 @@ router.post("/:id/complete", requireAuth, async (req, res) => {
     if (end.odometer == null) {
       return res.status(409).json({ error: "vehicle_asleep", detail: "Wake your vehicle to complete the mission." });
     }
+    if (CATEGORIES.includes(req.body?.category)) mission.category = req.body.category;
+    if (!mission.category) mission.category = "family";
+
     const miles = Math.max(0, +(end.odometer - mission.start.odometer).toFixed(1));
     const batteryDrop = Math.max(0, (mission.start.battery ?? 0) - (end.battery ?? 0));
     const kwh = +((batteryDrop / 100) * PACK_KWH).toFixed(1);
     const cost = +(kwh * RATE_PER_KWH).toFixed(2);
     const gasCost = +((miles / GAS_MPG) * GAS_PRICE).toFixed(2);
     const saved = +Math.max(0, gasCost - cost).toFixed(2);
+    const durationMin = Math.round((new Date(end.at) - new Date(mission.startedAt)) / 60000);
+    const deduction = mission.category === "business" || mission.category === "rental"
+      ? +(miles * IRS_RATE).toFixed(2)
+      : 0;
 
     mission.status = "complete";
     mission.end = end;
     mission.endedAt = end.at;
     mission.fromName = (req.body?.fromName || "").slice(0, 40).toUpperCase() || "LAUNCH SITE";
     mission.toName = (req.body?.toName || "").slice(0, 40).toUpperCase() || "DESTINATION";
-    mission.stats = { miles, kwh, cost, saved };
+    mission.notes = (req.body?.notes || "").slice(0, 200);
+    mission.stats = { miles, kwh, cost, saved, durationMin, deduction };
     saveMissions(req.userId, missions);
     res.json({ mission });
   } catch (err) {
