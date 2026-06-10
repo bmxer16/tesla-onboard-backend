@@ -137,7 +137,7 @@ export async function getVehicleData(userId, vehicleTag) {
     'gui_settings',
     'vehicle_state',
     'vehicle_config',
-  ].join(';');
+  ].join('%3B');
 
   const url = `${TESLA_FLEET_API_NA}/api/1/vehicles/${vehicleTag}/vehicle_data?endpoints=${endpoints}`;
   const res = await fetch(url, {
