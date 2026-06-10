@@ -8,6 +8,7 @@ import commandRoutes from "./routes/commands.js";
 import waitlistRoutes from "./routes/waitlist.js";
 import teslaAuthRoutes from "./routes/teslaAuth.js";
 import teslaVehicleRoutes from "./routes/teslaVehicles.js";
+import missionRoutes from "./routes/missions.js";
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use("/api/waitlist", waitlistRoutes);
 // Real Tesla integration (Path A - OAuth + Fleet API + Commands)
 app.use("/api/tesla/auth", teslaAuthRoutes);
 app.use("/api/tesla", teslaVehicleRoutes);
+app.use("/api/missions", missionRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);
