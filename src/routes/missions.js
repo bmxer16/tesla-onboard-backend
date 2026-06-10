@@ -11,7 +11,7 @@ const RATE_PER_KWH = 0.16;
 const GAS_MPG = 30;
 const GAS_PRICE = 4.8;
 const IRS_RATE = 0.725;
-const CATEGORIES = ["business", "rental", "family"];
+const CATEGORIES = ["business", "rental", "family", "vacation", "roadtrip"];
 
 async function snapshot(userId) {
   const vehicles = await teslaApi.listVehicles(userId);
