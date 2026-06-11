@@ -117,6 +117,16 @@ router.patch("/:id/category", requireAuth, (req, res) => {
   res.json({ mission });
 });
 
+router.patch("/:id/route", requireAuth, (req, res) => {
+  const missions = getMissions(req.userId);
+  const mission = missions.find((m) => m.id === req.params.id);
+  if (!mission || mission.status !== "complete") return res.status(404).json({ error: "not_found" });
+  if (req.body?.fromName) mission.fromName = String(req.body.fromName).slice(0, 40).toUpperCase();
+  if (req.body?.toName) mission.toName = String(req.body.toName).slice(0, 40).toUpperCase();
+  saveMissions(req.userId, missions);
+  res.json({ mission });
+});
+
 router.delete("/:id", requireAuth, (req, res) => {
   const missions = getMissions(req.userId).filter((m) => m.id !== req.params.id);
   saveMissions(req.userId, missions);
