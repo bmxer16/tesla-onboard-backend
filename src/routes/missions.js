@@ -6,7 +6,7 @@ import { getMissions, saveMissions } from "../lib/missionStore.js";
 
 const router = express.Router();
 const PACK_KWH = 75, RATE_PER_KWH = 0.16, GAS_MPG = 30, GAS_PRICE = 4.8, IRS_RATE = 0.725;
-const CATEGORIES = ["business", "rental", "family", "vacation", "roadtrip"];
+const CATEGORIES = ["business", "rental", "family", "vacation", "roadtrip", "unclassified"];
 
 async function snapshot(userId) {
   const vehicles = await teslaApi.listVehicles(userId);
@@ -123,6 +123,28 @@ router.patch("/:id/route", requireAuth, (req, res) => {
   if (!mission || mission.status !== "complete") return res.status(404).json({ error: "not_found" });
   if (req.body?.fromName) mission.fromName = String(req.body.fromName).slice(0, 40).toUpperCase();
   if (req.body?.toName) mission.toName = String(req.body.toName).slice(0, 40).toUpperCase();
+  saveMissions(req.userId, missions);
+  res.json({ mission });
+});
+
+router.post("/:id/photo", requireAuth, (req, res) => {
+  const missions = getMissions(req.userId);
+  const mission = missions.find((m) => m.id === req.params.id);
+  if (!mission || mission.status !== "complete") return res.status(404).json({ error: "not_found" });
+  const d = req.body?.dataUrl;
+  if (!d || typeof d !== "string" || !d.startsWith("data:image/jpeg") || d.length > 500000) return res.status(400).json({ error: "bad_photo" });
+  mission.photos = mission.photos || [];
+  if (mission.photos.length >= 4) return res.status(400).json({ error: "max_photos" });
+  mission.photos.push(d);
+  saveMissions(req.userId, missions);
+  res.json({ mission });
+});
+
+router.delete("/:id/photo/:idx", requireAuth, (req, res) => {
+  const missions = getMissions(req.userId);
+  const mission = missions.find((m) => m.id === req.params.id);
+  if (!mission || !mission.photos) return res.status(404).json({ error: "not_found" });
+  mission.photos.splice(Number(req.params.idx), 1);
   saveMissions(req.userId, missions);
   res.json({ mission });
 });

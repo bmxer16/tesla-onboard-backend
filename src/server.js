@@ -1,3 +1,4 @@
+import { startTripWatcher } from "./lib/tripWatcher.js";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -17,7 +18,7 @@ const PORT = process.env.PORT || 4000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "tesla-onboard-backend", time: new Date().toISOString() });
@@ -38,6 +39,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
+startTripWatcher();
 app.listen(PORT, () => {
   console.log(`Tesla Onboard backend listening on :${PORT}`);
   console.log(`CORS origin: ${CORS_ORIGIN}`);
